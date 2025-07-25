@@ -1,0 +1,46 @@
+version: '3'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: go-logger-app
+    ports:
+      - "8088:8088"
+    volumes:
+      - ./app_logs:/app_logs
+
+  victorialogs-server:
+    image: victoriametrics/victoria-logs:latest
+    container_name: victorialogs-server
+    ports:
+      - "9428:9428"
+    volumes:
+      - ./vlogs_data:/victoria-metrics-data
+    command:
+      - -storageDataPath=/victoria-metrics-data
+      - -retentionPeriod=30d
+  
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: micro-svc-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin 
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:9.0.0
+    container_name: filebeat-to-victorialogs
+    user: root
+    # 在macOS上，使用Docker提供的特殊卷来访问容器日志
+    volumes:
+      - ./app_logs:/app_logs:ro 
+      - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+    # 使用Docker的日志驱动
+    depends_on:
+      - victorialogs-server
+      - app
+    network_mode: "host"
