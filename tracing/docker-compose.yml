@@ -1,0 +1,28 @@
+version: '3'
+
+services:
+  tempo-server:
+    image: grafana/tempo:latest
+    container_name: tempo-server
+    user: root
+    network_mode: host
+    ports:
+      - "3200:3200"
+      - "4317:4317"
+    volumes:
+      - ./tempo_data:/tmp/tempo
+    command:
+      - "-storage.trace.backend=local"
+      - "-storage.trace.local.path=/tmp/tempo/traces"
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector-server
+    network_mode: host
+    ports:
+      - "14317:14317" # OTLP gRPC (for services to send to Collector)
+      - "14318:14318" # OTLP HTTP (optional)
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    command:
+      - "--config=/etc/otel-collector-config.yaml" 

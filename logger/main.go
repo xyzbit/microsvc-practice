@@ -85,10 +85,10 @@ func main() {
 func InitLogger() {
 
 	// 创建日志目录
-	os.MkdirAll("/app_logs", 0755)
+	os.MkdirAll("./app_logs", 0755)
 
 	// 创建日志文件
-	logFile, err := os.OpenFile("/app_logs/app.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	logFile, err := os.OpenFile("./app_logs/app.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
