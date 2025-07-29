@@ -11,7 +11,7 @@ processors:
 
 exporters:
   otlp: # 将数据通过OTLP gRPC发送给Tempo
-    endpoint: "localhost:4317" # Tempo容器的服务名和OTLP gRPC端口
+    endpoint: "tempo-server:4317" # Tempo容器的服务名和OTLP gRPC端口
     tls:
       insecure: true # 仅用于本地演示，生产环境应使用TLS
 

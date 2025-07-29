@@ -5,24 +5,47 @@ services:
     image: grafana/tempo:latest
     container_name: tempo-server
     user: root
-    network_mode: host
     ports:
       - "3200:3200"
       - "4317:4317"
+      - "4318:4318"
     volumes:
+      - ./tempo.yaml:/etc/tempo.yaml
       - ./tempo_data:/tmp/tempo
     command:
       - "-storage.trace.backend=local"
       - "-storage.trace.local.path=/tmp/tempo/traces"
+      - "-config.file=/etc/tempo.yaml"
+      # - "-server.grpc-listen-port=4317"
+    networks:
+      - tracing-network
 
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:latest
+    image: otel/opentelemetry-collector:0.86.0
     container_name: otel-collector-server
-    network_mode: host
     ports:
       - "14317:14317" # OTLP gRPC (for services to send to Collector)
       - "14318:14318" # OTLP HTTP (optional)
     volumes:
       - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
     command:
-      - "--config=/etc/otel-collector-config.yaml" 
+      - "--config=/etc/otel-collector-config.yaml"
+    depends_on:
+      - tempo-server
+    networks:
+      - tracing-network
+      
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: tracing-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    networks:
+      - tracing-network
+
+networks:
+  tracing-network:
+    driver: bridge 
