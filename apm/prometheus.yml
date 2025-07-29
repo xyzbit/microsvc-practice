@@ -1,0 +1,66 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  # Prometheus 自身监控
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Tempo 监控
+  - job_name: 'tempo'
+    static_configs:
+      - targets: ['tempo:3200']
+    scrape_interval: 5s
+    metrics_path: /metrics
+
+  # Grafana 监控
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['grafana:3000']
+
+  # Loki 监控
+  - job_name: 'loki'
+    static_configs:
+      - targets: ['loki:3100']
+
+  # 微服务监控
+  - job_name: 'api-gateway'
+    static_configs:
+      - targets: ['api-gateway:8080']
+    metrics_path: /metrics
+    scrape_interval: 5s
+
+  - job_name: 'user-service'
+    static_configs:
+      - targets: ['user-service:8080']
+    metrics_path: /metrics
+    scrape_interval: 5s
+
+  - job_name: 'order-service'
+    static_configs:
+      - targets: ['order-service:8080']
+    metrics_path: /metrics
+    scrape_interval: 5s
+
+  - job_name: 'notification-service'
+    static_configs:
+      - targets: ['notification-service:8080']
+    metrics_path: /metrics
+    scrape_interval: 5s
+
+# 告警配置（可选）
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+# 远程写入配置（用于接收 Tempo 生成的指标）
+remote_write:
+  - url: http://localhost:9090/api/v1/write 

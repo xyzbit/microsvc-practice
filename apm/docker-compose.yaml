@@ -1,0 +1,171 @@
+services:
+  # Tempo - 分布式追踪后端
+  tempo:
+    image: grafana/tempo:2.3.1
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+      - ./tempo.yaml:/etc/tempo.yaml
+      - tempo-data:/tmp/tempo
+    ports:
+      - "3200:3200"   # tempo
+      - "9095:9095"   # tempo grpc
+      - "4317:4317"   # otlp grpc
+      - "4318:4318"   # otlp http
+    networks:
+      - apm-network
+
+  # Grafana - 可视化界面
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-storage:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    networks:
+      - apm-network
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+
+  # Prometheus - 指标收集
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    networks:
+      - apm-network
+
+  # Loki - 日志聚合
+  loki:
+    image: grafana/loki:2.9.2
+    container_name: loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki-config.yml:/etc/loki/local-config.yaml
+      - loki-data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - apm-network
+
+  # Promtail - 日志收集器
+  promtail:
+    image: grafana/promtail:2.9.2
+    container_name: promtail
+    volumes:
+      - ./promtail-config.yml:/etc/promtail/config.yml
+      - ./logs:/var/log/app
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - apm-network
+    depends_on:
+      - loki
+
+  # 微服务A - 用户服务
+  user-service:
+    build: ./services/user-service
+    container_name: user-service
+    ports:
+      - "8081:8080"
+    environment:
+      - SERVICE_NAME=user-service
+      - JAEGER_ENDPOINT=tempo:4318
+      - PROMETHEUS_PORT=8080
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - apm-network
+    depends_on:
+      - tempo
+      - prometheus
+
+  # 微服务B - 订单服务
+  order-service:
+    build: ./services/order-service
+    container_name: order-service
+    ports:
+      - "8082:8080"
+    environment:
+      - SERVICE_NAME=order-service
+      - JAEGER_ENDPOINT=tempo:4318
+      - USER_SERVICE_URL=http://user-service:8080
+      - PROMETHEUS_PORT=8080
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - apm-network
+    depends_on:
+      - tempo
+      - prometheus
+      - user-service
+
+  # 微服务C - 通知服务
+  notification-service:
+    build: ./services/notification-service
+    container_name: notification-service
+    ports:
+      - "8083:8080"
+    environment:
+      - SERVICE_NAME=notification-service
+      - JAEGER_ENDPOINT=tempo:4318
+      - PROMETHEUS_PORT=8080
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - apm-network
+    depends_on:
+      - tempo
+      - prometheus
+
+  # API Gateway - 统一入口
+  api-gateway:
+    build: ./services/api-gateway
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVICE_NAME=api-gateway
+      - JAEGER_ENDPOINT=tempo:4318
+      - USER_SERVICE_URL=http://user-service:8080
+      - ORDER_SERVICE_URL=http://order-service:8080
+      - NOTIFICATION_SERVICE_URL=http://notification-service:8080
+      - PROMETHEUS_PORT=8080
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - apm-network
+    depends_on:
+      - tempo
+      - prometheus
+      - user-service
+      - order-service
+      - notification-service
+
+volumes:
+  tempo-data:
+  grafana-storage:
+  prometheus-data:
+  loki-data:
+
+networks:
+  apm-network:
+    driver: bridge 
